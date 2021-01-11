@@ -1,0 +1,330 @@
+---
+title: "Predicting Words Milestone 1"
+author: "WritPen"
+date: "1/10/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Project Description
+This project examines the frequencies of common words in sequence, to begin to build an algorithm that will predict or suggest the next word the writer intends to type. 
+This project uses data from SwiftKey (swiftkey.com) from US twitter, blogs, and news sources.
+
+
+This project endeavors to be reproducible (Peng, 2011, 2016), and follows the John Hopkins Univeristy Biostatistics Capstone project.
+
+Packages needed for this project:
+- knitr
+- tm
+- quanteda
+- stringr
+- ggplot2
+- caret
+
+# Summary Statistics and Loading in the data
+The data files are large. The files also need to be cleaned prior to developing a model. 
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(cache = TRUE)
+```
+```{r}
+con <- file("en_US.twitter.txt", "r") 
+allLines <- suppressWarnings(readLines(con))
+twitter_len <- length(allLines)
+writeLines(paste("twitter file length:",twitter_len))
+```
+
+```{r}
+longest_line <- 0
+for (idx in 1:twitter_len) {
+  linelength <- nchar(allLines[idx])
+  if (linelength > longest_line) 
+  { 
+    longest_line <- linelength 
+  }
+}
+writeLines(paste("longest twitter line :",longest_line,"characters"))
+```
+```{r}
+close(con) # close connection to twitter document to save on RAM
+
+con <- file("en_US.blogs.txt", "r")
+allLines <- suppressWarnings(readLines(con))
+blogs_len <- length(allLines)
+writeLines(paste("blogs file length:",blogs_len))
+```
+``` {r}
+longest_line <- 0
+for (idx in 1:blogs_len) {
+        linelength <- nchar(allLines[idx])
+        if (linelength > longest_line)
+        {
+                longest_line <- linelength
+        }
+}
+writeLines(paste("longest blogs line:",longest_line,"characters"))
+```
+```{r}
+close(con) # close connection to blogs document to save on RAM
+
+con <- file("en_US.news.txt", "r")
+allLines <- suppressWarnings(readLines(con))
+news_len <- length(allLines)
+writeLines(paste("news file length:",news_len))
+```
+``` {r}
+longest_line <- 0
+for (idx in 1:news_len) {
+        linelength <- nchar(allLines[idx])
+        if (linelength > longest_line)
+        {
+                longest_line <- linelength
+        }
+}
+writeLines(paste("longest news line:",longest_line,"characters"))
+```
+```{r}
+close(con) # close connection to news document to save on RAM
+```
+
+# Tokenization and Transformation
+To minimize the amount of RAM utilized in processing, the model is built using a sample of the full corpus. This also doubles as creating a training set, where further samples can be pulled to test the effectiveness of the algorithm on additional samples in the corpus. Each sample, as pulled, will need to be preprossed/cleaned prior to running the final algorithms. 
+
+The data will be easier to run in analysis if the words are clearly written following rules for plain English (https://en.wikipedia.org/wiki/Plain_English). The following code:
+1. removes special letters (e.g. those with accents), 
+2. makes all text lines lowercase, 
+3. removes non-alphabetic characters, 
+4. deletes extra spaces
+5. replaces common contractions with full words
+
+```{r echo=FALSE}
+library(quanteda)
+corpus_sample <- corpus(allLines)
+```
+```{r}
+library(quanteda)
+fix.syntax <- function(text, wordCount = 350000) {
+                # Remove special-characters words (e.g. 'f---', 'f***', 'f#@%')
+                text <- gsub(text, "\\b[a-z]+[#$%&()*+/:<=>@[\\^_`|~-]+")                
+                return(text)
+        }
+        convertText <- function (text) {
+                # Replace common contractions
+                # auxiliary + negation
+                text <- ConvertTo(text, "\\bcan't\\b", "cannot")
+                text <- ConvertTo(text, "\\bwon't\\b", "will not")
+                text <- ConvertTo(text, "\\bshan't\\b", "shall not")
+                text <- ConvertTo(text, "\\bain't\\b", "am not")
+                # verb + negation (isn't, aren't, wasn't, etc.)
+                text <- ConvertTo(text, "n't\\b", " not")
+                # miscellaneous forms
+                text <- ConvertTo(text, "\\blet's\\b", "let us")
+                text <- ConvertTo(text, "\\bc'mon\\b", "come on")
+                text <- ConvertTo(text, "'n\\b", " and")
+                # pronoun + verb
+                text <- ConvertTo(text, "\\bi'm\\b", "i am")
+                text <- ConvertTo(text, "'re\\b", " are")
+                text <- ConvertTo(text, "'s\\b", " is")
+                text <- ConvertTo(text, "'d\\b", " would")
+                text <- ConvertTo(text, "'ll\\b", " will")
+                text <- ConvertTo(text, "'ve\\b", " have")
+                # Replace contractions with full words
+                text <- ConvertTo(text, "\\bb\\b", "be")
+                text <- ConvertTo(text, "\\bc\\b", "see")
+                text <- ConvertTo(text, "\\bm\\b", "am")
+                text <- ConvertTo(text, "\\bn\\b", "and")
+                text <- ConvertTo(text, "\\bo\\b", "oh")
+                text <- ConvertTo(text, "\\br\\b", "are")
+                text <- ConvertTo(text, "\\bu\\b", "you")
+                text <- ConvertTo(text, "\\by\\b", "why")
+                text <- ConvertTo(text, "\\b1\\b", "one")
+                text <- ConvertTo(text, "\\b2\\b", "to")
+                text <- ConvertTo(text, "\\b4\\b", "for")
+                text <- ConvertTo(text, "\\b8\\b", "ate")
+                text <- ConvertTo(text, "\\b2b\\b", "to be")
+                text <- ConvertTo(text, "\\b2day\\b", "today")
+                text <- ConvertTo(text, "\\b2moro\\b", "tomorrow")
+                text <- ConvertTo(text, "\\b2morow\\b", "tomorrow")
+                text <- ConvertTo(text, "\\b2nite\\b", "tonight")
+                text <- ConvertTo(text, "\\bl8r\\b", "later")
+                text <- ConvertTo(text, "\\b4vr\\b", "forever")
+                text <- ConvertTo(text, "\\b4eva\\b", "forever")
+                text <- ConvertTo(text, "\\b4ever\\b", "forever")
+                text <- ConvertTo(text, "\\bb4\\b", "before")
+                text <- ConvertTo(text, "\\bcu\\b", "see you")
+                text <- ConvertTo(text, "\\bcuz\\b", "because")
+                text <- ConvertTo(text, "\\btnx\\b", "thanks")
+                text <- ConvertTo(text, "\\btks\\b", "thanks")
+                text <- ConvertTo(text, "\\bthks\\b", "thanks")
+                text <- ConvertTo(text, "\\bthanx\\b", "thanks")
+                text <- ConvertTo(text, "\\bu2\\b", "you too")
+                text <- ConvertTo(text, "\\bur\\b", "your")
+                text <- ConvertTo(text, "\\bgr8\\b", "great")
+                return(text)
+        }
+        
+        cleanText <- function(text) {
+                # remove punctuation and other special characters
+                text <- removePunctuation(text,
+                                          preserve_intra_word_dashes = TRUE)
+                
+                # gsub hashtags
+                text <- gsub("#", pattern, "#\\w+")
+                
+                # gsub "rt"
+                text <- gsub("rt", pattern, "\\brt\\b")
+                
+                # gsub email addresses
+                text <-
+                        gsub("@", pattern, "( \\S+\\@\\S+\\..{1,3}(\\s)? )")
+                
+                # gsub things starting with http
+                text <- gsub("http", pattern, "http[^[:space:]]*")
+                
+                # gsub slashes
+                text <- ConvertTo(text, "/|@|\\|", " ")
+                
+                return(text)
+
+        # Truncate text to the last wordCount words
+        text <- substring(text, 350000)
+        
+        # Convert to lowercase
+        text <- tolower(text)
+        
+        # Convert contractions
+        text <- convertText(text)
+        
+        # Truncate text to the last wordCount words
+        text <- substring(text, 350000)
+        
+        # remove profanity
+        text <- removeProfanity(text)
+        
+        # Clean
+        text <- cleanText(text)
+        
+        # remove numbers
+        text <- gsub(text, "[^a-z ]")
+        
+        # Strip out extra whitespace
+        text <- str_trim(stripWhitespace(text), side = 'both') 
+        
+        if (length(text) == 0)
+                return("")
+        else
+                return(text)
+}
+
+write.fix.file <- function(corpus_sample, new_file){
+   my_text <- read_lines(corpus)
+   new_text <- fix.letters(my_text)
+   clean_text <- fix.syntax(new_text)
+   
+   write_lines(new_text, file=new_file)
+}
+new_file <- 'corpus_fix.txt'
+corpus_fix <- paste0(corpus_sample, new_file)
+# if (!file.exists(dir, new_file[1]))
+str(corpus_fix)
+```
+
+# Generating the tokens with quanteda
+In this project a token is a word, a string with an identified meaning.
+
+```{r}
+library(quanteda)
+my_tokens <- tokens(corpus_sample, what='word', remove_punct=TRUE, split_hyphens=TRUE, remove_numbers=TRUE, remove_symbols=TRUE)
+```
+
+# Exploratory ngrams
+This section explores word counts. This analysis counts single, pairs (bigrams), three somes (trigrams). Then the plot of the frequencies is plotted. This illustrates the balance between accuracy and computer processing needs. The small dataset allows for fairly quick accuracy quickly within the sample, but with out of sample error potentially increasing as the sample's use grows.
+
+```{r}
+library(ggplot2)
+tokens_ngram_1 <- dfm(my_tokens)
+text_freq_1 <- textstat_frequency(tokens_ngram_1, n=30)
+plot1 <- ggplot(text_freq_1, aes(x=reorder(feature, frequency), y=frequency)) +
+   geom_bar(stat = "identity", fill = I("dark green")) + coord_flip() +
+   labs(x = NULL, y = "Frequency")
+png("plot1.png", height=480, width = 480)
+plot1
+dev.off()
+```
+```{r}
+set.seed(40)
+textplot1 <- textplot_wordcloud(tokens_ngram_1, max_words=30)
+png("textplot1.png", height=480, width = 480)
+textplot1
+dev.off()
+```
+# Bigrams frequency
+```{r}
+tokens_ngram_2 <- dfm(tokens_ngrams(my_tokens, n=2))
+text_freq_2 <- textstat_frequency(tokens_ngram_2, n=30)
+plot2 <- ggplot(text_freq_2, aes(x=reorder(feature, frequency), y=frequency)) +
+   geom_bar(stat = "identity", fill = I("dark green")) + coord_flip()
+   labs(x = NULL, y = "Frequency")
+png("plot2.png", height=480, width = 480)
+plot2
+dev.off()
+```
+```{r}
+set.seed(45)
+textplot2 <- textplot_wordcloud(tokens_ngram_2, max_words=50)
+png("textplot2.png", height=480, width = 480)
+textplot2
+dev.off()
+```
+
+# Trigrams Frequency
+```{r}
+tokens_ngram_3 <- dfm(tokens_ngrams(my_tokens, n=3))
+text_freq_3 <- textstat_frequency(tokens_ngram_3, n=30)
+plot3 <-ggplot(text_freq_3, aes(x=reorder(feature, frequency), y=frequency)) +
+   geom_bar(stat = "identity", fill = I("dark green")) + coord_flip() +
+   labs(x = NULL, y = "Frequency")
+png("plot3.png", height=480, width = 480)
+plot3
+dev.off()
+```
+
+```{r}
+set.seed(43)
+textplot3 <- textplot_wordcloud(tokens_ngram_3, max_words=30)
+png("textplot3.png", height=480, width = 480)
+textplot3
+dev.off()
+```
+
+# Quadgrams Frequency
+```{r}
+tokens_ngram_4 <- dfm(tokens_ngrams(my_tokens, n=4))
+text_freq_4 <- textstat_frequency(tokens_ngram_4, n=30)
+plot4 <- ggplot(text_freq_4, aes(x=reorder(feature, frequency), y=frequency)) +
+   geom_bar(stat = "identity", fill = I("dark green")) + coord_flip() +
+   labs(x = NULL, y = "Frequency")
+png("plot4.png", height=480, width = 480)
+plot4
+dev.off()
+```
+```{r}
+set.seed(86)
+textplot4 <- textplot_wordcloud(tokens_ngram_4, max_words=20)
+png("textplot4.png", height=480, width = 480)
+textplot4
+dev.off()
+```
+
+# Considerations for future exploration
+1. We might consider the limitations of the Shiny server for processing, and limit the amount of text that feeds into the process for a timely, efficient set of algorithms.
+2. Further cleaning of invalid words, such as truncated text vernacular.
+3. Further transformation of words where the special characters and contractions complicate the model.

@@ -1,0 +1,92 @@
+---
+title: "Milestone2"
+author: "WritPen"
+date: "1/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Milestone 2 - Algorithms
+
+#stemming and removing stopwords
+```{r}
+sw <- stopwords("english")
+tokens_remove(my_tokens, sw)
+
+dtm <- dfm(allLines, tolower=TRUE, stem=TRUE, remove = stopwords("english"))
+```
+
+
+Weighting terms that have more use
+```{r}
+doc_freq <- docfreq(dtm) #document frequency per term (column)
+dtm <- dtm[, doc_freq >=50] # select terms with doc_freq >= 50
+dtm <- dfm_tfidf(dtm, force=TRUE) #weight features
+dtm
+
+```
+
+```{r}
+## parameter is list of file names
+summary <- function(l = l) {
+        summary <- data.frame(row.names = l)
+        for (i in 1:length(l)) {
+                con <- file(paste(path, l[i], sep = ""), "r")
+                lines <- readLines(con, skipNul = TRUE)
+                summary$NumberOfLines[i] <- length(lines)
+                summary$MeanLineLength[i] <- round(mean(nchar(lines)),0)
+                summary$MedianLineLength[i] <- median(nchar(lines))
+                summary$MinLineLength[i] <- min(nchar(lines))
+                summary$MaxLineLength[i] <- max(nchar(lines))
+                summary$EstWordCountMn[i] <- round(sum(nchar(lines))/5.1/1000000, 1)
+                summary$MbInMemory[i] <- round(object.size(lines)/1000000,1)
+                rm(lines)
+                close(con)
+        }
+        kable(summary)
+}
+```
+
+Building the master table
+```{r}
+#Setting the frequencies from the ngrams
+library(data.table)
+library(keyholder)
+text_freq_all1 <- textstat_frequency(tokens_ngram_1)
+#set keys for streamline in processing the matchup of prefix words.
+keys(text_freq_all1) <- 1:nrow(text_freq_all1)
+
+
+text_freq_all2 <- textstat_frequency(tokens_ngram_2)
+keys(text_freq_all2) <- 1:nrow(text_freq_all2)
+# text_freq_all2$prefix1to2 <- text_freq_all1[ , prefix1to2 := paste(unlist(strsplit(feature, "_",)), collapse = "_"), by = feature]
+# text_freq_all2[ , prefixcount1to2 := fr1[prefix1to2, frequency1], by = feature]
+# text_freq_all2[ , ratio2to1 := frequency2/prefixcount1to2]
+
+
+text_freq_all3 <- textstat_frequency(tokens_ngram_3)
+keys(text_freq_all3) <- 1:nrow(text_freq_all3)
+
+text_freq_all4 <- textstat_frequency(tokens_ngram_4)
+keys(text_freq_all4) <- 1:nrow(text_freq_all4)
+
+# frameall <- merge(text_freq_all1, text_freq_all2, by.x = "feature", by.y = "rank", all=TRUE)
+# frameall <- merge(frameall, text_freq_all3, by.x = "feature", by.y = "rank", all=TRUE)
+
+# frameall[ , c("frequency1", "rank1", "frequency2", "rank2", "prefixcount1to2", "frequency3", "rank3", "prefixcount2to3") := NULL]
+
+# head(frameall)
+# save(frameall, file = "frameall")
+save(text_freq_1, file = "text_freq_1.Rdata")
+save(text_freq_2, file = "text_freq_2.Rdata")
+save(text_freq_3, file = "text_freq_3.Rdata")
+save(text_freq_4, file = "text_freq_4.Rdata")
+save(text_freq_all1, file = "text_freq_all1.Rdata")
+save(text_freq_all2, file = "text_freq_all2.Rdata")
+save(text_freq_all3, file = "text_freq_all3.Rdata")
+save(text_freq_all4, file= "text_freq_all4.Rdata")
+
+```

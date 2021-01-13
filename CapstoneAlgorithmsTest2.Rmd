@@ -1,0 +1,92 @@
+---
+title: "Predict functions"
+author: "WritPen"
+date: "1/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+This function predicts the next word based on the previous words in the most common bi, tri, and quad grams.
+```{r}
+library(tidyverse)
+library(tibble)
+library(dplyr)
+library(stringr)
+
+
+#tables of words
+bi_words <- read.csv("bigram5.csv")
+tri_words <- read.csv("trigram5.csv")
+quad_words <- read.csv("quadgram61.csv")
+# all <- read.csv("dtm_all2.csv")
+```
+
+<!-- Most frequent bigrams, trigrams, and quadgrams are ranked within the files. -->
+
+```{r}
+#The function to get the most frequent bigrams
+bigram <- function(input_words){
+  num <- length(input_words)
+  filter(bi_words, 
+         word1==input_words[num]) %>% 
+    top_n(1) %>%
+    filter(row_number() == 1L) %>%
+    select(num_range("word", 2)) %>%
+    as.character() -> out
+  ifelse(out =="character(0)", "?", return(out))
+}
+
+#The function to get the most frequent trigrams
+trigram <- function(input_words){
+  num <- length(input_words)
+  filter(tri_words, 
+         word1==input_words[num-1], 
+         word2==input_words[num])  %>% 
+    top_n(1) %>%
+    filter(row_number() == 1L) %>%
+    select(num_range("word", 3)) %>%
+    as.character() -> out
+  ifelse(out=="character(0)", bigram(input_words), return(out))
+}
+
+#The function to get the most frequent quadgrams
+quadgram <- function(input_words){
+  num <- length(input_words)
+  filter(quad_words, 
+         word1==input_words[num-2], 
+         word2==input_words[num-1], 
+         word3==input_words[num])  %>% 
+    top_n(1) %>%
+    filter(row_number() == 1L) %>%
+    select(num_range("word", 4)) %>%
+    as.character() -> out
+  ifelse(out=="character(0)", trigram(input_words), return(out))
+}
+```
+# Taking text input and formatting it 
+After the text is formatted, we can call the matching function to find the most frequent ngram. With the frequent ngram, we can calculate a prediction.
+
+
+```{r}
+predict <- function(input){
+  # Create a dataframe
+  input <- tibble(text = input)
+  # Clean the Inpput
+  replace_reg <- "[^[:alpha:][:space:]]*"
+  input <- input %>%
+    mutate(text = str_replace_all(text, replace_reg, ""))
+  # Find word count, separate words, lower case
+  input_count <- str_count(input, boundary("word"))
+  input_words <- unlist(str_split(input, boundary("word")))
+  input_words <- tolower(input_words)
+  # Call the matching functions
+  out <- ifelse(input_count == 1, bigram(input_words), 
+                ifelse (input_count == 2, trigram(input_words), quadgram(input_words)))
+  # Output
+  return(out)
+}
+
+```

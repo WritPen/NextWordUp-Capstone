@@ -38,7 +38,6 @@ You will need R packages:
 	- Ggplot2
 	- Caret
 
-You can use the shiny app at: https://writpen.shinyapps.io/LanguageProcessing/
-or by running in your RStudio console with the materials in the attached files.
+You can use the shiny app by running in your RStudio console with the materials in the attached files.
 
 The matching presentation for the project is here: RPubs - Next Word Up Presentation
